@@ -1,12 +1,12 @@
 import os
 import re
-from pathlib import Path
 from typing import Any, Callable, Tuple
 
 import numpy as np
 import numpy.typing as npt
 from astropy.io import fits
 from scipy.interpolate import interp1d
+from pathlib import Path
 
 # from . import poly, specwcs
 from grismconf import poly
@@ -231,8 +231,8 @@ class GrismConf:
         fname = self._get_file_path(f"SENSITIVITY_{order}")
 
         with fits.open(fname) as fin:
-            wavs = fin[1].data.field("WAVELENGTH")[:] * 1
-            sens = fin[1].data.field("SENSITIVITY")[:] * 1
+            wavs = fin[1].data.field("WAVELENGTH")[:] * 1  # pyright: ignore[reportAttributeAccessIssue]
+            sens = fin[1].data.field("SENSITIVITY")[:] * 1  # pyright: ignore[reportAttributeAccessIssue]
 
         # Fix for cases where sensitivity is not zero on edges
         sens[0:2] = 0.0
