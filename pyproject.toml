@@ -1,6 +1,6 @@
 [project]
 name = "grismconf"
-version = "0.2.dev"
+version = "2.0.dev"
 description = "GRISM Configuration python code, described in ISR 2017-01: A More Generalized Coordinate Transformation Approach for Grisms, Pirzkal & Ryan 2017 http://www.stsci.edu/hst/wfc3/documents/ISRs/WFC3-2017-01.pdf"
 readme = "README.md"
 authors = [
