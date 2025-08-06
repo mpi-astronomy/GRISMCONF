@@ -104,6 +104,18 @@ yp = y0 + dy
 - **Scalable**: Supports vector operations for full spectral traces
 ```
 
+## Current major changes from the original package
+
+1. Added unit tests
+2. Updated to packaging standards of Python 3.10+ (`pyproject.toml`)
+3. Split of `Config:DataModel` and `Config:GrismConf` into `datamodel:DataModel` and `grismconf2.GrismConf`. 
+4. `grismconf2.GrismConf` has been refactored to help maintenance and extensibility. It keeps the legacy API of the original `grismconf.Config` class
+5. Added minimal documentation to `docs/intro.md`.
+
+```{warning} datamodel
+datamodel.DataModel is not yet implemented.
+```
+
 ## Technical Notes
 
 - Analytical inverses are provided for polynomials up to order (1,3) for computational efficiency
