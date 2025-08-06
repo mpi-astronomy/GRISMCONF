@@ -364,7 +364,8 @@ def npol(m):
     return int((m + 1) ** 2 / 2.0 + (m + 1) / 2.0)
 
 
-def test(n, m):
+def test(n, m, seed=42):
+    np.random.seed(seed)
     e = np.random.rand(n + 1, npol(m))
     x = 100.0
     y = 100.0
@@ -376,4 +377,4 @@ def test(n, m):
 
 
 if __name__ == "__main__":
-    test(1, 0)
+    test(2, 10)
