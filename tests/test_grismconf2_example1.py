@@ -3,6 +3,7 @@ import re
 from typing import List
 
 import numpy as np
+import pytest
 import requests
 
 from grismconf.grismconf2 import GrismConf
@@ -54,12 +55,25 @@ def fetch_conf_dependencies(
     return file_list
 
 
-def test_example1():
+@pytest.fixture(scope="session")
+def collect_test_data():
+    """Collects test data for the GrismConf class."""
     fname = fetch_file(EXAMPLE_NIRCAM_CONF_URL)
     temp_files = [fname]
 
     # Fetch dependencies
     temp_files += fetch_conf_dependencies(EXAMPLE_NIRCAM_CONF_URL, fname)
+
+    yield fname, temp_files
+
+    # Clean up temporary files
+    for temp_file in temp_files:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+
+def test_example1(collect_test_data):
+    fname, _ = collect_test_data
 
     # example position
     x0, y0 = 500.5, 600.1
@@ -114,19 +128,9 @@ def test_example1():
         "wavs[-1] should be close to 2.64881764"
     )
 
-    # Clean up temporary files
-    # FIXME: Uncomment the following lines if you want to remove the temporary files after the test
-    # for temp_file in temp_files:
-    #     if os.path.exists(temp_file):
-    #         os.remove(temp_file)
 
-
-def test_example2():
-    fname = fetch_file(EXAMPLE_NIRCAM_CONF_URL)
-    temp_files = [fname]
-
-    # Fetch dependencies
-    temp_files += fetch_conf_dependencies(EXAMPLE_NIRCAM_CONF_URL, fname)
+def test_example2(collect_test_data):
+    fname, _ = collect_test_data
 
     # example position
     x0, y0 = 500.5, 600.1
@@ -139,10 +143,3 @@ def test_example2():
     assert np.isclose(ratio_12, -0.523209215269946, atol=1e-14), (
         "ratio_12 should be close to -0.523209215269946"
     )
-
-    # Clean up temporary files
-    # FIXME: Uncomment the following lines if you want to remove the temporary files after the test
-    # for temp_file in temp_files:
-    #     if os.path.exists(temp_file):
-    #         os.remove(temp_file)
-
