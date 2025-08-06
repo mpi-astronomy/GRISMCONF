@@ -1,9 +1,9 @@
-from typing import List
 import os
 import re
+from typing import List
 
-import requests
 import numpy as np
+import requests
 
 import grismconf
 
@@ -71,8 +71,12 @@ def test_example1():
     dx01 = C.DISPX("+1", x0, y0, np.array([0, 1]))
     assert dx01.shape == (2,)
     assert dx01[0] < dx01[1], "dx01 should be increasing"
-    assert np.isclose(dx01[0], -49.85361111, atol=1e-6), "dx01[0] should be close to -49.85361111"
-    assert np.isclose(dx01[1], -48.48791052, atol=1e-6), "dx01[1] should be close to  -48.48791052"
+    assert np.isclose(dx01[0], -49.85361111, atol=1e-6), (
+        "dx01[0] should be close to -49.85361111"
+    )
+    assert np.isclose(dx01[1], -48.48791052, atol=1e-6), (
+        "dx01[1] should be close to  -48.48791052"
+    )
 
     # Get a list of all dxs value along this trace
     dxs = np.arange(dx01[0], dx01[1])
@@ -81,25 +85,57 @@ def test_example1():
     assert ts.shape == (len(dxs),), "ts should have the same length as dxs"
     assert np.all(ts >= 0) and np.all(ts <= 1), "ts should be in the range [0, 1]"
     assert np.isclose(ts[0], 0.0, atol=1e-6), "ts[0] should be close to 0.0"
-    assert np.isclose(ts[-1], 0.72035807, atol=1e-6), "ts[-1] should be close to 0.72035807"
+    assert np.isclose(ts[-1], 0.72035807, atol=1e-6), (
+        "ts[-1] should be close to 0.72035807"
+    )
 
-    #dys: [-1530.876494   -1373.38785167], wavs: [2.49696493 2.64881764]
+    # dys: [-1530.876494   -1373.38785167], wavs: [2.49696493 2.64881764]
     # Compute the dys values for the same pixels
     dys = C.DISPY("+1", x0, y0, ts)
     assert dys.shape == (len(dxs),), "dys should have the same length as dxs"
     assert np.all(dys <= 0), "dys should be non-positive"
-    assert np.isclose(dys[0], -1530.876494, atol=1e-6), "dys[0] should be close to -1530.876494"
-    assert np.isclose(dys[-1], -1373.38785167, atol=1e-6), "dys[-1] should be close to -1373.38785167"
+    assert np.isclose(dys[0], -1530.876494, atol=1e-6), (
+        "dys[0] should be close to -1530.876494"
+    )
+    assert np.isclose(dys[-1], -1373.38785167, atol=1e-6), (
+        "dys[-1] should be close to -1373.38785167"
+    )
 
     # Compute wavelength of each of the pixels
     wavs = C.DISPL("+1", x0, y0, ts)
     assert wavs.shape == (len(dxs),), "wavs should have the same length as dxs"
-    assert np.all(wavs >= 2.4) and np.all(wavs <= 2.7), "wavs should be in the range [2.4, 2.7]"
-    assert np.isclose(wavs[0], 2.49696493, atol=1e-6), "wavs[0] should be close to 2.49696493"
-    assert np.isclose(wavs[-1], 2.64881764, atol=1e-6), "wavs[-1] should be close to 2.64881764"
+    assert np.all(wavs >= 2.4) and np.all(wavs <= 2.7), (
+        "wavs should be in the range [2.4, 2.7]"
+    )
+    assert np.isclose(wavs[0], 2.49696493, atol=1e-6), (
+        "wavs[0] should be close to 2.49696493"
+    )
+    assert np.isclose(wavs[-1], 2.64881764, atol=1e-6), (
+        "wavs[-1] should be close to 2.64881764"
+    )
 
     # Clean up temporary files
     # FIXME: Uncomment the following lines if you want to remove the temporary files after the test
     # for temp_file in temp_files:
     #     if os.path.exists(temp_file):
     #         os.remove(temp_file)
+
+
+def test_example2():
+    fname = fetch_file(EXAMPLE_NIRCAM_CONF_URL)
+    temp_files = [fname]
+
+    # Fetch dependencies
+    temp_files += fetch_conf_dependencies(EXAMPLE_NIRCAM_CONF_URL, fname)
+
+    # example position
+    x0, y0 = 500.5, 600.1
+
+    # Load the Grism Configuration file
+    C = grismconf.Config(fname)
+
+    ratio_12 = C.DDISPL("+1", x0, y0, 0) / C.DDISPX("+2", x0, y0, 0)
+
+    assert np.isclose(ratio_12, -0.523209215269946, atol=1e-14), (
+        "ratio_12 should be close to -0.523209215269946"
+    )
