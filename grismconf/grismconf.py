@@ -1,12 +1,12 @@
 import os
 import re
+from pathlib import Path
 from typing import Any, Callable, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from astropy.io import fits  # type: ignore
+from astropy.io import fits
 from scipy.interpolate import interp1d
-from pathlib import Path
 
 from . import poly, specwcs
 
@@ -750,7 +750,7 @@ class Config:
         """Helper function that looks for the name of the sensitivity file, reads it and
         stores the content in a simple list [WAVELENGTH, SENSITIVITY]."""
         fname = os.path.join(
-            self.GRISM_CONF_PATH, # type: ignore
+            self.GRISM_CONF_PATH,  # type: ignore
             self._get_value("SENSITIVITY_%s" % (order)),  # type: ignore[call-arg] # noqa: E501
         )
         with fits.open(fname) as fin:

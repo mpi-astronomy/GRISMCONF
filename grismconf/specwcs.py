@@ -120,9 +120,9 @@ def get_sensitivity(
 
     # We need to get the pixel size of the detector. We also get the PUPIL and FILTER name
     with fits.open(wfss_file) as fin:
-        pixel_area = fin[1].header["PIXAR_SR"]
-        pupil = fin[0].header["PUPIL"]
-        filter = fin[0].header["FILTER"]
+        pixel_area = fin[1].header["PIXAR_SR"]  # type: ignore[no-untyped-call]
+        pupil = fin[0].header["PUPIL"]  # type: ignore[no-untyped-call]
+        filter = fin[0].header["FILTER"]  # type: ignore[no-untyped-call]
 
     m = datamodels.open(wfss_file)
 

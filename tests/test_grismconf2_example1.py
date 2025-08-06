@@ -5,7 +5,7 @@ import re
 import requests
 import numpy as np
 
-import grismconf
+from grismconf.grismconf2 import GrismConf
 
 EXAMPLE_NIRCAM_CONF_URL = "https://raw.githubusercontent.com/npirzkal/GRISM_NIRCAM/refs/heads/master/V9/NIRCAM_F250M_modA_C.conf"
 EXAMPLE_WFC3_CONF_URL = "https://raw.githubusercontent.com/npirzkal/GRISM_WFC3/refs/heads/master/IR/G102.conf"
@@ -65,7 +65,7 @@ def test_example1():
     x0, y0 = 500.5, 600.1
 
     # Load the Grism Configuration file
-    C = grismconf.Config(fname)
+    C = GrismConf(fname)
 
     # edges of spectra (use t=0 and t=1)
     dx01 = C.DISPX("+1", x0, y0, np.array([0, 1]))

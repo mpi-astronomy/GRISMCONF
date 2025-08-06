@@ -1,12 +1,12 @@
 import os
 import re
+from pathlib import Path
 from typing import Any, Callable, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from astropy.io import fits  # type: ignore
+from astropy.io import fits
 from scipy.interpolate import interp1d
-from pathlib import Path
 
 # from . import poly, specwcs
 from grismconf import poly
