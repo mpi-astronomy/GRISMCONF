@@ -1,6 +1,7 @@
 # Note: Code provided by R. Ryan.
 
 import os
+from typing import Union
 
 import numpy as np
 import requests
@@ -29,7 +30,7 @@ def fetch_reffile(filename: str, overwrite: bool = True, show: bool = True) -> N
             print(f"Using local copy of {filename}")
 
 
-def reformat_poly(obj: polynomial.Polynomial1D | polynomial.Polynomial2D) -> list:
+def reformat_poly(obj: Union[polynomial.Polynomial1D, polynomial.Polynomial2D]) -> list:
     """
     Function to transform an astropy.Polynomial object into an list() that matches a given row of a grismconf file
     This function removes the astropy dependency after reading the configuration file.
@@ -108,7 +109,7 @@ def get_sensitivity(
     -------
     tuple[np.ndarray, np.ndarray]
         A tuple containing the wavelength array and the sensitivity values in units of erg/s/cm^2/A per DN/s.
-    
+
     Raises
     ------
     NameError
