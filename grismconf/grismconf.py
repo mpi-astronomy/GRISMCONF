@@ -3,6 +3,7 @@ import os
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import interp1d
+from pathlib import Path
 
 from . import poly, specwcs
 
@@ -77,7 +78,11 @@ class Config:
         self.wy: float = 0.0
 
         try:
-            # fits.open(filename)  # file tpe check... is this necessary?
+            # fits.open(filename)  # file type check... is this necessary?
+            # Annoyingly testing for fits with a large library
+            # Replacing by suffix testing (which is what jwst datamodel does anyways)
+            if Path(filename).suffix.lower() != ".fits":
+                raise OSError("File is not a FITS file")
             self.__init_DATAMODEL(filename)
         except OSError:
             self.__init_GRISMCONF(filename, DIRFILTER=None)
