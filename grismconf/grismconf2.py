@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Mapping
 
 import numpy as np
 import numpy.typing as npt
@@ -135,22 +135,23 @@ class GrismConf:
 
         # get pixel (DISP & INVDISP) coefficients
         # note: when missing defined as array([], shape=(0, 0), dtype=float64
-        self._disp_data: dict[str, dict[str, np.ndarray]] = self._get_disp_data()
+        self._disp_data: Mapping[str, Mapping[str, npt.NDArray[np.float64]]] = self._get_disp_data()
 
         # shapes of the DISP and INVDISP coefficients per order
-        self._polyname = {}
+        # missing orders will be defined as shape (0, 0)
+        self._polyname: dict[str, dict[str, tuple[int, int]]] = {}
         for key in self._disp_data.keys():
             self._polyname[key] = {}
             for order in self.orders:
                 self._polyname[key][order] = np.shape(self._disp_data[key][order])
 
         # get sensitivity data
-        self._sens_data: dict[str, Tuple[np.ndarray, np.ndarray]] = (
+        self._sens_data: Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = (
             self._get_sens_data()
         )
 
         # set wavelength range for each order
-        self.WRANGE: dict[str, Tuple[float, float]] = self._set_wrange(self._sens_data)
+        self.WRANGE: Mapping[str, Tuple[float, float]] = self._set_wrange(self._sens_data)
 
     def get_sensitivity_function(self, order: str) -> interp1d:
         """Get the sensitivity function for a specific order.
@@ -179,7 +180,7 @@ class GrismConf:
             return
         self.rotation_theta = np.radians(fwcpos - self.FWCPOS_REF)  # type: ignore
 
-    def _get_disp_data(self) -> dict[str, dict[str, np.ndarray]]:
+    def _get_disp_data(self) -> Mapping[str, Mapping[str, npt.NDArray[np.float64]]]:
         """Extracts the DISP coefficients from the configuration."""
         data = {}
         for key in ("DISPX", "DISPY", "DISPL", "INVDISPX", "INVDISPY", "INVDISPL"):
@@ -195,7 +196,7 @@ class GrismConf:
                     data[key][order] = np.empty((0, 0))
         return data
 
-    def _get_sens_data(self) -> dict[str, Tuple[np.ndarray, np.ndarray]]:
+    def _get_sens_data(self) -> Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
         """Extracts the sensitivity data from the configuration."""
         # get sensitivity data
         data = {}
@@ -205,8 +206,8 @@ class GrismConf:
 
     @staticmethod
     def _set_wrange(
-        sens_data: dict[str, Tuple[np.ndarray, np.ndarray]],
-    ) -> dict[str, Tuple[float, float]]:
+        sens_data: Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]],
+    ) -> Mapping[str, Tuple[float, float]]:
         """Set the wavelength range for each order based on the sensitivity data."""
         wrange = {}
         for order, (wavs, sens) in sens_data.items():
@@ -223,7 +224,7 @@ class GrismConf:
         else:
             raise ValueError(f"{key} not defined in the configuration file.")
 
-    def _get_sensitivity(self, order: str) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_sensitivity(self, order: str) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Helper function that looks for the name of the sensitivity file,
         reads it and stores the content in a simple list
         [WAVELENGTH, SENSITIVITY].
@@ -279,7 +280,7 @@ class GrismConf:
             raise ValueError("NAXIS not defined in the configuration file.")
 
     @property
-    def POM_POLYGON(self) -> np.ndarray:
+    def POM_POLYGON(self) -> npt.NDArray[np.float64]:
         return np.array(
             [self.config.get("POMX", np.nan), self.config.get("POMY", np.nan)]
         ).transpose()
@@ -298,15 +299,15 @@ class GrismConf:
         return self.config.get("FWCPOS_REF", None)
 
     @property
-    def _DISPL_data(self) -> dict:
+    def _DISPL_data(self) -> Mapping:
         return self._disp_data["DISPL"]
 
     @property
-    def _DISPX_data(self) -> dict:
+    def _DISPX_data(self) -> Mapping:
         return self._disp_data["DISPX"]
 
     @property
-    def _DISPY_data(self) -> dict:
+    def _DISPY_data(self) -> Mapping:
         return self._disp_data["DISPY"]
 
     def rotate_trace(
@@ -321,7 +322,7 @@ class GrismConf:
         Parameters
         ----------
         dx, dy : float or `~numpy.ndarray`
-            x and y coordinages
+            x and y coordinates
 
         theta : float
             CW rotation angle, in radians
