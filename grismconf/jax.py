@@ -2,18 +2,36 @@
 
 import re
 from typing import Mapping, Tuple, override
+from functools import partial
 
 import jax
 import jax.numpy as jnp
 from jax import Array as JDArray
 
-from . import poly
 from .grismconf2 import GrismConf
+from . import poly
 from .poly import npol
 
 POLY = {k: jax.jit(v) for k, v in poly.POLY.items()}
 DPOLY = {k: jax.jit(v) for k, v in poly.DPOLY.items()}
 INVPOLY = {k: jax.jit(v) for k, v in poly.INVPOLY.items()}
+
+
+def interp1d(x, y, kind="linear", axis=-1, copy=True, bounds_error=None, fill_value=float("nan"), assume_sorted=False):
+    """JAX-compatible 1D interpolation function."""
+    if kind != "linear":
+        raise NotImplementedError("Only linear interpolation is currently supported in JAX.")
+
+    if not assume_sorted:
+        idx = jnp.argsort(x, axis=axis)
+        xp = jnp.take_along_axis(x, idx, axis=axis)
+        fp = jnp.take_along_axis(y, idx, axis=axis)
+    
+    @jax.jit
+    def interpolator(x_new):
+        """Linear interpolation function."""
+        return jnp.interp(x_new, xp, fp, left=fill_value, right=fill_value)
+    return interpolator
 
 
 class JaxGrismConf(GrismConf):
@@ -125,7 +143,7 @@ class JaxGrismConf(GrismConf):
             wavelength value
 
         """
-        return poly.POLY[self._polyname["DISPL"][order]](
+        return POLY[self._polyname["DISPL"][order]](
             self._disp_data["DISPL"][order], x0, y0, t
         )
 
@@ -155,11 +173,11 @@ class JaxGrismConf(GrismConf):
             wavelength value
 
         """
-        return poly.DPOLY[self._polyname["DISPL"][order]](
+        return DPOLY[self._polyname["DISPL"][order]](
             self._disp_data["DISPL"][order], x0, y0, t
         )
 
-    def DISPX(
+    def DISPX(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         order: str,
         x0: JDArray,
@@ -185,7 +203,7 @@ class JaxGrismConf(GrismConf):
             Trace x-coordinates as a function of `t`
 
         """
-        return -self.wx + poly.POLY[self._polyname["DISPX"][order]](
+        return -self.wx + POLY[self._polyname["DISPX"][order]](
             self._disp_data["DISPX"][order], x0, y0, t
         )
 
@@ -216,7 +234,7 @@ class JaxGrismConf(GrismConf):
             Trace x-coordinates as a function of `t`
 
         """
-        return poly.DPOLY[self._polyname["DISPX"][order]](
+        return DPOLY[self._polyname["DISPX"][order]](
             self._disp_data["DISPX"][order], x0, y0, t
         )
 
@@ -247,7 +265,7 @@ class JaxGrismConf(GrismConf):
             Trace y-coordinates as a function of `t`
 
         """
-        return -self.wy + poly.POLY[self._polyname["DISPY"][order]](
+        return -self.wy + POLY[self._polyname["DISPY"][order]](
             self._disp_data["DISPY"][order], x0, y0, t
         )
 
@@ -278,7 +296,7 @@ class JaxGrismConf(GrismConf):
             Trace y-coordinates as a function of `t`
 
         """
-        return poly.DPOLY[self._polyname["DISPY"][order]](
+        return DPOLY[self._polyname["DISPY"][order]](
             self._disp_data["DISPY"][order], x0, y0, t
         )
 
@@ -355,14 +373,14 @@ class JaxGrismConf(GrismConf):
         polyname = self._polyname["DISPL"][order]
         try:
             polydata = self._disp_data["DISPL"][order]
-            return poly.INVPOLY[polyname](polydata, x0, y0, wavelength)
+            return INVPOLY[polyname](polydata, x0, y0, wavelength)
         except KeyError:
             invpolydata = self._disp_data["INVDISPL"][order]
             if invpolydata.size > 0:
-                return poly.POLY[polyname](invpolydata, x0, y0, wavelength)
+                return POLY[polyname](invpolydata, x0, y0, wavelength)
             else:
                 xr = self.DISPL(order, x0, y0, t0)
-                so = np.argsort(xr)
+                so = jnp.argsort(xr)
                 interpolator = interp1d(
                     xr[so],
                     t0[so],
@@ -405,14 +423,14 @@ class JaxGrismConf(GrismConf):
         polyname = self._polyname["DISPX"][order]
         try:
             polydata = self._disp_data["DISPX"][order]
-            return poly.INVPOLY[polyname](polydata, x0, y0, dx + self.wx)
+            return INVPOLY[polyname](polydata, x0, y0, dx + self.wx)
         except KeyError:
             invpolydata = self._disp_data["INVDISPX"][order]
             if invpolydata.size > 0:
-                return poly.POLY[polyname](invpolydata, x0, y0, dx)
+                return POLY[polyname](invpolydata, x0, y0, dx)
             else:
                 xr = self.DISPX(order, x0, y0, t0)
-                so = np.argsort(xr)
+                so = jnp.argsort(xr)
                 interpolator = interp1d(
                     xr[so],
                     t0[so],
@@ -453,14 +471,14 @@ class JaxGrismConf(GrismConf):
         polyname = self._polyname["DISPY"][order]
         try:
             polydata = self._disp_data["DISPY"][order]
-            return poly.INVPOLY[polyname](polydata, x0, y0, dy + self.wy)
+            return INVPOLY[polyname](polydata, x0, y0, dy + self.wy)
         except KeyError:
             invpolydata = self._disp_data["INVDISPY"][order]
             if invpolydata.size > 0:
-                return poly.POLY[polyname](invpolydata, x0, y0, dy)
+                return POLY[polyname](invpolydata, x0, y0, dy)
             else:
                 yr = self.DISPY(order, x0, y0, t0)
-                so = np.argsort(yr)
+                so = jnp.argsort(yr)
                 interpolator = interp1d(
                     yr[so],
                     t0[so],
