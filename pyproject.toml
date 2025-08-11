@@ -1,0 +1,53 @@
+[project]
+name = "grismconf"
+version = "2.0.dev"
+description = "GRISM Configuration python code, described in ISR 2017-01: A More Generalized Coordinate Transformation Approach for Grisms, Pirzkal & Ryan 2017 http://www.stsci.edu/hst/wfc3/documents/ISRs/WFC3-2017-01.pdf"
+readme = "README.md"
+authors = [
+  {name = "Pradyun GedamNor Pirzkal", email = "npirzkal@mac.com"},
+  {name = "Ivelina  Momcheva", email = "momcheva@mpia.de"},
+  {name = "Raphael Erik Hviding ", email = "Hviding@mpia.de"},
+  {name = "Morgan Fouesneau", email = "fouesneau@mpia.de"},
+]
+license = {text = "BSD 3-Clause License"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent"
+]
+requires-python = ">=3.12"
+dependencies = [
+    "astropy>=7.1.0",
+    "jax>=0.7.0",
+    "jwst>=1.19.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "requests>=2.32.4",
+    "scipy>=1.16.1",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.setuptools.packages.find]
+where = ["."]                 # list of folders that contain the packages (["."] by default)
+include = ["grismconf*"]      # package names should match these glob patterns (["*"] by default)
+exclude = ["unittests"]       # exclude packages matching these glob patterns (empty by default)
+namespaces = true             # to disable scanning PEP 420 namespaces (true by default)
+
+[tool.setuptools.package-data]
+grismconf = []
+
+[project.optional-dependencies]
+
+testing = [
+    "pytest",
+    "pytest-doctestplus",
+    "codecov",
+    "pytest-cov"]
+
+ci = [
+  "toml",
+  "ruff",
+  "isort"]

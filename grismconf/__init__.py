@@ -1,4 +1,3 @@
-from .grismconf import Config
-#from . import poly
-__version__ = "1.50"
+from .grismconf import Config  # noqa: F401
 
+__version__ = "2.0.dev"
