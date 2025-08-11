@@ -118,23 +118,28 @@ def get_sensitivity(
         If the sensitivity file does not contain the expected filter, pupil, and order information.
     """
 
-    # We need to get the pixel size of the detector. We also get the PUPIL and FILTER name
-    with fits.open(wfss_file) as fin:
-        pixel_area = fin[1].header["PIXAR_SR"]  # type: ignore[no-untyped-call]
-        pupil = fin[0].header["PUPIL"]  # type: ignore[no-untyped-call]
-        filter = fin[0].header["FILTER"]  # type: ignore[no-untyped-call]
+    # We need to get the pixel size of the detector.
+    # We also get the PUPIL and FILTER name
 
-    m = datamodels.open(wfss_file)
+    # FIXME: Direct approach without datamodel -- general solution needed
+    # with fits.open(wfss_file) as fin:
+    #    pixel_area = fin[1].header["PIXAR_SR"]  # type: ignore[no-untyped-call]
+    #    pupil = fin[0].header["PUPIL"]  # type: ignore[no-untyped-call]
+    #    filter = fin[0].header["FILTER"]  # type: ignore[no-untyped-call]
 
-    sensitivity_file = m.meta.ref_file.photom.name[7:]
+    with datamodels.open(wfss_file) as dm:
+        # parameters = dm.get_crds_parameters()
+        sensitivity_file = dm.meta.ref_file.photom.name[7:]
+        pupil = dm.meta.instrument.pupil
+        filter = dm.meta.instrument.filter
+
     fetch_reffile(sensitivity_file, overwrite=False, show=False)
 
     tab = Table.read(sensitivity_file)
+    pixel_area = tab.meta["PIXAR_SR"]
     ok = (tab["filter"] == filter) & (tab["pupil"] == pupil) & (tab["order"] == order)
-    (
-        w,
-        s,
-    ) = np.asarray(tab[ok][0]["wavelength"]), np.asarray(tab[ok][0]["relresponse"])
+    w = np.asarray(tab[ok][0]["wavelength"])
+    s = np.asarray(tab[ok][0]["relresponse"])
     photmjsr = tab[ok][0]["photmjsr"]
     ok = np.nonzero(w)
     w = w[ok]
@@ -170,39 +175,33 @@ def specwcs_poly(wfss_file, order=1):
     NameError
         If the WFSS file does not contain the required WCS information.
     """
-
-    # Check if the input file has the required WCS information
-    with datamodels.open(wfss_file) as dm:
-        try:
-            dm.meta.ref_file.specwcs.name[7:]
-            dm.meta.ref_file.photom.name[7:]
-            dm.meta.photometry.pixelarea_steradians
-        except Exception:
-            raise NameError(
-                "Failed to find WFSS WCS information in input file. Make sure that the JWST pipeline wcs_assign and photom steps were applied."
-            )
-
     _DISPX_data = {}
     _DISPY_data = {}
     _DISPL_data = {}
     SENS_data = {}
-    with datamodels.open(wfss_file) as tree:
-        t = tree["meta"].wcs.get_transform(
-            from_frame="detector", to_frame="grism_detector"
+
+    with datamodels.open(wfss_file) as dm:
+        t = dm.meta.wcs.get_transform(
+            from_frame="detector",
+            to_frame="grism_detector",
         )[-1]
-        for g, order in enumerate(t.orders):
-            sorder = "{0:+}".format(order)
-            _DISPX_data[sorder] = np.array([reformat_poly(p2d) for p2d in t.xmodels[g]])
-            if len(t.xmodels[g]) == 1:
+        for order, xmodel, ymodel, lmodel in zip(
+            t.orders, t.xmodels, t.ymodels, t.lmodels
+        ):
+            sorder = f"{order:+}"
+            _DISPX_data[sorder] = np.array([reformat_poly(p2d) for p2d in xmodel])
+            if len(xmodel) == 1:
                 _DISPX_data[sorder] = _DISPX_data[sorder][0]
 
-            _DISPY_data[sorder] = np.array([reformat_poly(p2d) for p2d in t.ymodels[g]])
-            if len(t.ymodels[g]) == 1:
+            _DISPY_data[sorder] = np.array([reformat_poly(p2d) for p2d in ymodel])
+            if len(ymodel) == 1:
                 _DISPY_data[sorder] = _DISPY_data[sorder][0]
 
-            _DISPL_data[sorder] = np.array([reformat_poly(p2d) for p2d in t.lmodels[g]])
-            if len(t.lmodels[g]) == 1:
-                _DISPL_data[sorder] = _DISPL_data[sorder][0]
+            # The lmodels are (5,) for the 5 orders, not (5, 3) for NIRISS
+            try:
+                _DISPL_data[sorder] = np.array([reformat_poly(p2d) for p2d in lmodel])
+            except TypeError:
+                _DISPL_data[sorder] = np.array(reformat_poly(lmodel))[0]
 
             SENS_data[sorder] = get_sensitivity(wfss_file, order=order)
 
