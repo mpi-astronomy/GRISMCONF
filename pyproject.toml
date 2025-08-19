@@ -33,7 +33,7 @@ build-backend = "hatchling.build"
 [tool.setuptools.packages.find]
 where = ["."]                 # list of folders that contain the packages (["."] by default)
 include = ["grismconf*"]      # package names should match these glob patterns (["*"] by default)
-exclude = ["unittests"]       # exclude packages matching these glob patterns (empty by default)
+exclude = ["tests"]           # exclude packages matching these glob patterns (empty by default)
 namespaces = true             # to disable scanning PEP 420 namespaces (true by default)
 
 [tool.setuptools.package-data]

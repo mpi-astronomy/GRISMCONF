@@ -1,12 +1,12 @@
 import os
 import re
-from typing import Any, Callable, Tuple, Mapping
+from pathlib import Path
+from typing import Any, Callable, Mapping, Tuple
 
 import numpy as np
 import numpy.typing as npt
 from astropy.io import fits
 from scipy.interpolate import interp1d
-from pathlib import Path
 
 # from . import poly, specwcs
 from grismconf import poly
@@ -38,6 +38,8 @@ class GrismconfParser(dict):
     """
 
     __mapper__: dict[str, Callable | type] = {
+        "FWCPOS_REF": float,
+        # NIRCAM FIELDS
         "NAXIS": int,
         "DISPL": float,
         "DISPY": float,
@@ -47,19 +49,30 @@ class GrismconfParser(dict):
         "POMX": float,
         "POMY": float,
         "WEDGE": float,
-        "FWCPOS_REF": float,
+        # NIRISS FIELDS
+        "BEAM": int,
+        "XOFF": float,
+        "YOFF": float,
+        "MMAG_EXTRACT": int,
+        "DYDX_ORDER": int,
+        "DISP_ORDER": int,
+        "DLDP": float,
+        "DYDX": float,
     }
 
     def __getitem__(self, key: Any) -> Any:
         """Get the value(s) associated with a key or pattern in the configuration."""
-        if value := super().get(key):
-            return value
-        # not direct match, try pattern search
-        matcher = re.compile(rf"{key}")
-        matches = self.__class__({k: v for k, v in self.items() if matcher.match(k)})
-        if matches:
-            return matches
-        raise KeyError(f"Key '{key}' not found in configuration.")
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            # not direct match, try pattern search
+            matcher = re.compile(rf"{key}")
+            matches = self.__class__(
+                {k: v for k, v in self.items() if matcher.match(k)}
+            )
+            if matches:
+                return matches
+            raise KeyError(f"Key '{key}' not found in configuration.")
 
     @classmethod
     def from_content(cls, content: str | list[str], **kwargs):
@@ -82,7 +95,13 @@ class GrismconfParser(dict):
                 continue
 
             # <name>_<+order>_j should still point to <name>
-            value_mapper = mapper.get(elements[0].split("_")[0], lambda x: x)
+            what = elements[0].split("_")
+            value_mapper = lambda x: x  # noqa: E731, default identity
+            for k in reversed(range(len(what))):
+                key = "_".join(what[:k])
+                if key in mapper:
+                    value_mapper = mapper[key]
+                    break
             values = [value_mapper(k) for k in elements[1:]]
             if not values:
                 data[elements[0]] = None
@@ -110,6 +129,65 @@ class GrismconfParser(dict):
         return cls.from_content(content, **kwargs)
 
 
+def transform_v2Conf(c: GrismconfParser, quiet: bool = False) -> GrismconfParser:
+    """Transform a v2.0 configuration to a v1.0 configuration.
+
+    This function maps the v2.0 order names (A, B, C, ...) to their corresponding
+    v1.0 order values (+1, 0, +2, ...).
+
+    The mapping between the two is hard coded and taken from [Grizly](https://github.com/gbrammer/grizli)
+
+    The detection of v2 scheme is based of the presence of keys like "BEAM[A|B|C|D|E|F]" in the configuration.
+    """
+    v2_order_names = {
+        "A": "+1",
+        "B": "0",
+        "C": "+2",
+        "D": "+3",
+        "E": "-1",
+        "F": "+4",
+    }
+
+    # detect format of the configuration
+    try:
+        assert len(c["BEAM[" + "|".join(v2_order_names) + "]"]) > 0, (
+            "impossible v2 detection error"
+        )
+        if not quiet:
+            print("Detected configuration format: v2.0 (orders defined as A, B, C...)")
+    except KeyError:
+        if not quiet:
+            print("Detected configuration format: v1.0 (orders defined as +<order>)")
+        return c
+
+    # copy over all values not associated with the beam info
+    new_conf = GrismconfParser()
+    beam_matcher_expr = r".*_{order_name}_\d+|.*_{order_name}$|BEAM{order_name}$"
+    order_name = "[" + "".join(v2_order_names) + "]"
+    copy_keys = [
+        k
+        for k in c.keys()
+        if not re.compile(beam_matcher_expr.format(order_name=order_name)).match(k)
+    ]
+    new_conf.update({k: c[k] for k in copy_keys})
+
+    # copy beam info and rename
+    which_beams = [(k, v) for k, v in v2_order_names.items() if f"BEAM{k}" in c]
+    for order_name, order_value in which_beams:
+        try:
+            subdata = c[beam_matcher_expr.format(order_name=order_name)]
+        except KeyError:
+            subdata = {}
+        for key, value in subdata.items():
+            if key.startswith("BEAM"):
+                new_key = f"{key[:-1]}_{order_value}"
+                new_conf[new_key] = [int(k) for k in value]
+                continue
+            new_key = key.replace(f"_{order_name}", f"_{order_value}")
+            new_conf[new_key] = value
+    return new_conf
+
+
 class GrismConf:
     """Class to read and hold GRISM configuration info from a grismconf file"""
 
@@ -135,7 +213,9 @@ class GrismConf:
 
         # get pixel (DISP & INVDISP) coefficients
         # note: when missing defined as array([], shape=(0, 0), dtype=float64
-        self._disp_data: Mapping[str, Mapping[str, npt.NDArray[np.float64]]] = self._get_disp_data()
+        self._disp_data: Mapping[str, Mapping[str, npt.NDArray[np.float64]]] = (
+            self._get_disp_data()
+        )
 
         # shapes of the DISP and INVDISP coefficients per order
         # missing orders will be defined as shape (0, 0)
@@ -146,12 +226,14 @@ class GrismConf:
                 self._polyname[key][order] = np.shape(self._disp_data[key][order])
 
         # get sensitivity data
-        self._sens_data: Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = (
-            self._get_sens_data()
-        )
+        self._sens_data: Mapping[
+            str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
+        ] = self._get_sens_data()
 
         # set wavelength range for each order
-        self.WRANGE: Mapping[str, Tuple[float, float]] = self._set_wrange(self._sens_data)
+        self.WRANGE: Mapping[str, Tuple[float, float]] = self._set_wrange(
+            self._sens_data
+        )
 
     def get_sensitivity_function(self, order: str) -> interp1d:
         """Get the sensitivity function for a specific order.
@@ -196,7 +278,9 @@ class GrismConf:
                     data[key][order] = np.empty((0, 0))
         return data
 
-    def _get_sens_data(self) -> Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
+    def _get_sens_data(
+        self,
+    ) -> Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
         """Extracts the sensitivity data from the configuration."""
         # get sensitivity data
         data = {}
@@ -206,7 +290,9 @@ class GrismConf:
 
     @staticmethod
     def _set_wrange(
-        sens_data: Mapping[str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]],
+        sens_data: Mapping[
+            str, Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
+        ],
     ) -> Mapping[str, Tuple[float, float]]:
         """Set the wavelength range for each order based on the sensitivity data."""
         wrange = {}
@@ -224,7 +310,9 @@ class GrismConf:
         else:
             raise ValueError(f"{key} not defined in the configuration file.")
 
-    def _get_sensitivity(self, order: str) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def _get_sensitivity(
+        self, order: str
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Helper function that looks for the name of the sensitivity file,
         reads it and stores the content in a simple list
         [WAVELENGTH, SENSITIVITY].
