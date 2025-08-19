@@ -25,7 +25,7 @@ def fetch_file(url: str, overwrite: bool = False) -> str:
 
 
 def fix_test_data(source: str = "niriss_test_data"):
-    """ The zenodo files are probably from various iterations and are not consistent.
+    """The zenodo files are probably from various iterations and are not consistent.
     This fixes the path to sensitivity data
     """
     config_files = glob(f"{source}/*.conf")
@@ -43,7 +43,9 @@ def fix_test_data(source: str = "niriss_test_data"):
                 parts = line.split()
                 if len(parts) > 1 and parts[1].endswith(".fits"):
                     parts[1] = parts[1].replace("wfss-grism-configuration/", "")
-                    parts[1] = ".".join(parts[1].split('.')[:3] + ["wd1657.p1.sens.fits"])
+                    parts[1] = ".".join(
+                        parts[1].split(".")[:3] + ["wd1657.p1.sens.fits"]
+                    )
                 fixed_content.append(" ".join(parts) + "\n")
             else:
                 fixed_content.append(line)
@@ -104,6 +106,51 @@ def test_transform_v2conf(fname="niriss_test_data/GR150C.F150W.221215.conf"):
             )
 
 
+class aXe:
+    @staticmethod
+    def field_dependent(xi, yi, coeffs):
+        """
+        aXe field-dependent coefficients
+
+        See the `aXe manual <http://axe.stsci.edu/axe/manual/html/node7.html#SECTION00721200000000000000>`_
+        for a description of how the field-dependent coefficients are specified.
+
+        Parameters
+        ----------
+        xi, yi : float or array-like
+            Coordinate to evaluate the field dependent coefficients, where
+            `xi = x-REFX` and `yi = y-REFY`.
+
+        coeffs : array-like
+            Field-dependency coefficients
+
+        Returns
+        -------
+        a : float or array-like
+            Evaluated field-dependent coefficients
+
+        """
+        # number of coefficients for a given polynomial order
+        # 1:1, 2:3, 3:6, 4:10, order:order*(order+1)/2
+        order = int(-1 + np.sqrt(1 + 8 * np.size(coeffs))) // 2
+
+        coeffs = np.asarray(coeffs, dtype=float)
+        xi = np.asarray(xi, dtype=float)
+        yi = np.asarray(yi, dtype=float)
+
+        # Build polynomial terms array
+        # $a = a_0+a_1x_i+a_2y_i+a_3x_i^2+a_4x_iy_i+a_5yi^2+$ ...
+        xy = []
+        for _p in range(order):
+            for _py in range(_p + 1):
+                xy.append(xi ** (_p - _py) * yi ** (_py))
+
+        # Evaluate the polynomial, allowing for N-dimensional inputs
+        a = np.sum((np.array(xy).T * coeffs).T, axis=0)
+
+        return a
+
+
 class GrismConf(grismconf2.GrismConf):
     def __init__(self, filename: str, dirfilter: str | None = None):
         """Initialize GrismConf object from a grismconf file."""
@@ -153,5 +200,11 @@ class GrismConf(grismconf2.GrismConf):
 
 
 if __name__ == "__main__":
-    fname = "wfss-grism-configuration/GR150C.F150W.221215.conf"
-    C = grismconf2.transform_v2Conf(grismconf2.GrismconfParser.from_file(fname))
+    fname = "niriss_test_data/GR150C.F150W.221215.conf"
+    C = GrismConf(fname)
+
+    dxlam = {
+        beam.replace("BEAM_", ""): np.arange(np.min(values), np.max(values), dtype=int)
+        for beam, values in C.config["BEAM"].items()
+    }
+    nx = {beam: values.shape[0] for beam, values in dxlam.items()}
